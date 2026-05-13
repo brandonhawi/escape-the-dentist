@@ -211,6 +211,87 @@ const game = {
   t: 0,
 };
 
+// ---------- hand-drawn pixel sprites ----------
+// 16x16, character facing +x (right). Rendered chunky at 32x32.
+const SPRITE_PAL = {
+  '.': null,
+  'K': '#1a0028', 'H': '#2a1808', 'h': '#4a2c14',
+  'S': '#f5c896', 's': '#c89060', 'E': '#15001f',
+  'G': '#00d8ff', 'g': '#009ec8',
+  'W': '#f0f0f5', 'w': '#b8b8c8',
+  'B': '#5ad0ff', 'b': '#2a90c0',
+  'P': '#ff7ac6', 'p': '#c0408a',
+  'R': '#ff2e88', 'Y': '#ffe44a',
+  'M': '#d8d8e0', 'm': '#707080',
+};
+function makeSprite(rows) {
+  const w = rows[0].length, h = rows.length;
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const c = cv.getContext('2d');
+  for (let y=0; y<h; y++) for (let x=0; x<w; x++) {
+    const col = SPRITE_PAL[rows[y][x]];
+    if (col) { c.fillStyle = col; c.fillRect(x, y, 1, 1); }
+  }
+  return cv;
+}
+const SPRITES = {
+  player: makeSprite([
+    "................",
+    "......KKKKKK....",
+    ".....KGGGGGGK...",
+    "....KGGGGGGGGK..",
+    "...KGKHHHHHHSGK.",
+    "..KGKHHEHHESSGK.",
+    "..KGKHHhhhhhSSGK",
+    ".KGKHHhhhhhSSSGK",
+    ".KGKHHhhhhhSSSGK",
+    "..KGKHHhhhhhSSGK",
+    "..KGKHHEHHESSGK.",
+    "...KGKHHHHHHSGK.",
+    "....KGGGGGGGGK..",
+    ".....KGGGGGGK...",
+    "......KKKKKK....",
+    "................",
+  ]),
+  dentist: makeSprite([
+    "................",
+    "......KKKKKK....",
+    ".....KWWWWWWK...",
+    "....KWWWWWWWWK..",
+    "...KWKBBBBBBSWK.",
+    "..KWKBBEBBEBbWK.",
+    "..KWKBBbbbbbBbWK",
+    ".KWKBBbbbbbbBbWK",
+    ".KWKBBbbbbbbBbWK",
+    "..KWKBBbbbbbBbWK",
+    "..KWKBBEBBEBbWK.",
+    "...KWKBBBBBBSWK.",
+    "....KWWWWWWWWK..",
+    ".....KWWWWWWK...",
+    "......KKKKKK....",
+    "................",
+  ]),
+  fast: makeSprite([
+    "................",
+    "......KKKKKK....",
+    ".....KPPPPPPK...",
+    "....KPPPPPPPPK..",
+    "...KPKBBBBBBSPK.",
+    "..KPKBBEBBEBbPK.",
+    "..KPKBBbbbbbBbPK",
+    ".KPKBBbbbbbbBbPK",
+    ".KPKBBbbbbbbBbPK",
+    "..KPKBBbbbbbBbPK",
+    "..KPKBBEBBEBbPK.",
+    "...KPKBBBBBBSPK.",
+    "....KPPPPPPPPK..",
+    ".....KPPPPPPK...",
+    "......KKKKKK....",
+    "................",
+  ]),
+};
+
 const WEAPONS = {
   fists:   { name:'FISTS',   range: 26, dmg: 1, cd: 0.25, type:'melee', col:'#fff' },
   syringe: { name:'SYRINGE', range: 30, dmg: 1, cd: 0.20, type:'melee', col:'#9be7ff' },
@@ -615,6 +696,7 @@ function updateParticles(dt) {
 // ---------- rendering ----------
 function render() {
   ctx.save();
+  ctx.imageSmoothingEnabled = false;
   // screen shake
   if (game.shake > 0) {
     ctx.translate((Math.random()-0.5)*game.shake, (Math.random()-0.5)*game.shake);
@@ -699,12 +781,8 @@ function render() {
     // shadow
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath(); ctx.ellipse(2, 3, e.r+2, e.r*0.5, 0, 0, Math.PI*2); ctx.fill();
-    // dentist coat
-    ctx.fillStyle = e.kind === 'fast' ? '#ff7ac6' : '#e8f0ff';
-    ctx.beginPath(); ctx.arc(0, 0, e.r, 0, Math.PI*2); ctx.fill();
-    // mask
-    ctx.fillStyle = '#9be7ff';
-    ctx.fillRect(2, -5, 6, 10);
+    // body sprite
+    ctx.drawImage(e.kind === 'fast' ? SPRITES.fast : SPRITES.dentist, -16, -16, 32, 32);
     // weapon
     const w = WEAPONS[e.weapon];
     ctx.fillStyle = w.col;
@@ -746,12 +824,8 @@ function render() {
     // shadow
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
     ctx.beginPath(); ctx.ellipse(2, 3, p.r+2, p.r*0.5, 0, 0, Math.PI*2); ctx.fill();
-    // gown
-    ctx.fillStyle = '#00f0ff';
-    ctx.beginPath(); ctx.arc(0, 0, p.r, 0, Math.PI*2); ctx.fill();
-    // face
-    ctx.fillStyle = '#ffe44a';
-    ctx.fillRect(4, -3, 5, 6);
+    // body sprite
+    ctx.drawImage(SPRITES.player, -16, -16, 32, 32);
     // weapon
     const w = WEAPONS[p.weapon];
     ctx.fillStyle = w.col;
