@@ -24,22 +24,27 @@ interface BspNode {
   room?: { x: number; y: number; w: number; h: number };
 }
 
-const MIN_LEAF = 5;     // smallest dimension a leaf may have along the split axis
-const ROOM_PAD = 1;     // tiles of leaf padding before the room starts
-const ROOM_SHRINK = 1;  // max extra random shrink per side
+const MIN_LEAF = 5;
+const ROOM_PAD = 1;
+const ROOM_SHRINK = 1;
+
+type SplitOrientation = 'horizontal' | 'vertical';
+
+function pickSplitOrientation(node: BspNode, rng: () => number): SplitOrientation | null {
+  const canH = node.h >= MIN_LEAF * 2;
+  const canV = node.w >= MIN_LEAF * 2;
+  if (!canH && !canV) return null;
+  if (node.w > node.h * 1.25 && canV) return 'vertical';
+  if (node.h > node.w * 1.25 && canH) return 'horizontal';
+  return canH && (!canV || rng() < 0.5) ? 'horizontal' : 'vertical';
+}
 
 function splitBsp(node: BspNode, rng: () => number, depth: number): void {
   if (depth <= 0) return;
-  const canSplitH = node.h >= MIN_LEAF * 2;
-  const canSplitV = node.w >= MIN_LEAF * 2;
-  if (!canSplitH && !canSplitV) return;
-  // bias: split along the longer axis
-  let splitH: boolean;
-  if (node.w > node.h * 1.25 && canSplitV) splitH = false;
-  else if (node.h > node.w * 1.25 && canSplitH) splitH = true;
-  else splitH = canSplitH && (!canSplitV || rng() < 0.5);
+  const orient = pickSplitOrientation(node, rng);
+  if (orient === null) return;
 
-  if (splitH) {
+  if (orient === 'horizontal') {
     const split = MIN_LEAF + Math.floor(rng() * (node.h - MIN_LEAF * 2 + 1));
     node.left  = { x: node.x, y: node.y,           w: node.w, h: split           };
     node.right = { x: node.x, y: node.y + split,   w: node.w, h: node.h - split  };
@@ -58,7 +63,6 @@ function placeRooms(node: BspNode, m: number[][], rng: () => number): void {
     if (node.right) placeRooms(node.right, m, rng);
     return;
   }
-  // leaf
   const padL = ROOM_PAD + Math.floor(rng() * (ROOM_SHRINK + 1));
   const padR = ROOM_PAD + Math.floor(rng() * (ROOM_SHRINK + 1));
   const padT = ROOM_PAD + Math.floor(rng() * (ROOM_SHRINK + 1));
@@ -75,7 +79,6 @@ function placeRooms(node: BspNode, m: number[][], rng: () => number): void {
   }
 }
 
-// Pick a random cell inside a leaf's room (or recurse into a random descendant for an internal node).
 function pickAnchor(node: BspNode, rng: () => number): { x: number; y: number } {
   if (node.room) {
     const r = node.room;
@@ -84,13 +87,11 @@ function pickAnchor(node: BspNode, rng: () => number): { x: number; y: number } 
       y: r.y + 1 + Math.floor(rng() * Math.max(1, r.h - 2)),
     };
   }
-  // internal node: drop into either child uniformly
   const side = rng() < 0.5 ? node.left! : node.right!;
   return pickAnchor(side, rng);
 }
 
 function carveCorridor(m: number[][], ax: number, ay: number, bx: number, by: number, rng: () => number): void {
-  // L-shape, randomly choose elbow direction (horizontal-first or vertical-first)
   const horizontalFirst = rng() < 0.5;
   if (horizontalFirst) {
     const xLo = Math.min(ax, bx), xHi = Math.max(ax, bx);
@@ -114,7 +115,6 @@ function connectSiblings(node: BspNode, m: number[][], rng: () => number): void 
   carveCorridor(m, a.x, a.y, b.x, b.y, rng);
 }
 
-// Collect all leaf rooms in BSP order.
 function collectRooms(node: BspNode, out: Array<{ x: number; y: number; w: number; h: number }>): void {
   if (node.room) { out.push(node.room); return; }
   if (node.left)  collectRooms(node.left,  out);
@@ -144,7 +144,6 @@ function bfsCanReach(m: number[][], sx: number, sy: number, tx: number, ty: numb
 }
 
 export function generateFloor(level: number): FloorData {
-  // Start fully walled in.
   const m: number[][] = [];
   for (let y = 0; y < ROWS; y++) {
     const row: number[] = [];
@@ -153,9 +152,7 @@ export function generateFloor(level: number): FloorData {
   }
   const rng = mulberry32(0x5eed + level * 97);
 
-  // Build BSP within the playable interior (leave the 1-tile border as walls).
   const root: BspNode = { x: 1, y: 1, w: COLS - 2, h: ROWS - 2 };
-  // Depth scales mildly with floor — more rooms on later floors.
   const depth = 3 + Math.min(2, Math.floor((level - 1) / 2));
   splitBsp(root, rng, depth);
   placeRooms(root, m, rng);
