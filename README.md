@@ -2,26 +2,62 @@
 
 A browser-based top-down twin-stick shooter in the spirit of Hotline Miami. You woke up mid-procedure. They're not letting you leave.
 
-**Play:** just open `index.html` in any modern browser. No build step, no dependencies.
+**Live:** https://brandonhawi.github.io/escape-the-dentist/
+
+## Stack
+
+- **Phaser 4** game engine
+- **TypeScript 6** (strict mode, run via Vite + esbuild)
+- **Vite** for the build (`npm run dev` / `npm run build`)
+- **GitHub Actions** builds & deploys to GitHub Pages on every push to `main`
+- **Kenney CC0** sprite art (`assets/KENNEY_LICENSE.txt`)
+
+## Development
+
+```bash
+npm install
+npm run dev      # Vite dev server on :5173
+npm run typecheck # tsc --noEmit
+npm run build    # → dist/
+npm run preview  # serve the built bundle
+```
+
+## Project layout
+
+```
+escape-the-dentist/
+├─ index.html              # Vite entry, mounts Phaser into #game
+├─ public/assets/          # static sprite PNGs (CC0 Kenney)
+├─ src/
+│  ├─ main.ts              # Phaser.Game config + scene list
+│  ├─ config.ts            # constants, weapon table, tile codes
+│  ├─ scenes/
+│  │  ├─ BootScene.ts      # preload sprites
+│  │  ├─ TitleScene.ts     # title screen + START
+│  │  ├─ GameScene.ts      # gameplay loop, AI, physics, attacks
+│  │  ├─ UIScene.ts        # HUD + controls strip + toast
+│  │  └─ OverlayScene.ts   # paused / dead / win overlays
+│  └─ systems/
+│     └─ WorldGen.ts       # procedural floor generation
+└─ .github/workflows/deploy.yml
+```
+
+Scenes run in parallel — `Game` for the world, `UI` for the HUD, `Overlay` launched on pause/death/win. Communication via `this.game.events` (`hud` and `toast` events).
 
 ## Controls
 
-| Key | Action |
-|---|---|
-| `WASD` | Move |
-| `Mouse` | Aim |
-| `LMB` | Attack / shoot |
-| `E` | Pick up weapon |
-| `R` | Throw current weapon |
-| `Space` | Dash |
-| `Enter` | Restart (on death / win) |
+| Key      | Action          |
+|----------|-----------------|
+| `WASD`   | Move            |
+| `Mouse`  | Aim             |
+| `LMB`    | Attack / shoot  |
+| `E`      | Pick up weapon  |
+| `R`      | Throw weapon    |
+| `Space`  | Dash            |
+| `P`      | Pause           |
+| `Enter`  | Restart on death/win |
 
-## Rules
-
-- One hit and you're dead. So are they.
-- Five floors of dental hell. Reach the yellow `EXIT` tile on each floor.
-- Enemies drop their weapons when killed. Throw a scalpel through a doorway, then run in and grab their drill.
-- Ranged weapons (dart pistol, novocain uzi) have limited ammo and auto-revert to fists when empty.
+One hit kills. Five floors. Reach the yellow `EXIT` tile.
 
 ## Weapons
 
@@ -30,6 +66,8 @@ A browser-based top-down twin-stick shooter in the spirit of Hotline Miami. You 
 - **Dart Pistol** — ranged, 8 darts
 - **Novocain Uzi** — ranged, 32 rounds, spread fire (floor 2+)
 
-## Tech
+Ranged weapons auto-revert to fists when empty.
 
-Single-file vanilla JS + HTML5 Canvas. ~700 lines. No frameworks. Tiny WebAudio synth for sound.
+## Credits
+
+Character sprites: [Kenney — Top-down Shooter](https://kenney.nl/assets/top-down-shooter) (CC0).
