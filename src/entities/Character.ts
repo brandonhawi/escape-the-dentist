@@ -11,9 +11,6 @@ export abstract class Character extends Phaser.Physics.Arcade.Sprite {
   cd = 0;
   alive = true;
 
-  // Force the cast: scene.physics.add.existing(this) guarantees a Body,
-  // and our constructor refuses to run without one. Downstream code can
-  // skip the `as Phaser.Physics.Arcade.Body` rigmarole.
   declare body: Phaser.Physics.Arcade.Body;
 
   constructor(scene: Phaser.Scene, x: number, y: number, texture: string) {

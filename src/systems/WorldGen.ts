@@ -121,7 +121,6 @@ function collectRooms(node: BspNode, out: Array<{ x: number; y: number; w: numbe
   if (node.right) collectRooms(node.right, out);
 }
 
-// BFS reachability used as a final paranoia check.
 function bfsCanReach(m: number[][], sx: number, sy: number, tx: number, ty: number): boolean {
   const seen = new Set<string>();
   const q: Array<[number, number]> = [[sx, sy]];
@@ -193,12 +192,19 @@ export function generateFloor(level: number): FloorData {
     if (m[cy][cx] === T_FLOOR) m[cy][cx] = T_CHAIR;
   }
 
-  // Paranoia check: BFS from spawn to the floor cell adjacent to exit.
-  // Sibling-corridor BSP guarantees this, but assert anyway so any
-  // future regression is loud.
-  if (!bfsCanReach(m, spawnTx, spawnTy, COLS - 2, exitY)) {
-    console.error('[WorldGen] BSP produced unreachable exit on level', level);
-  }
-
   return { map: m, rng, spawn };
+}
+
+export function isFloorConnected(data: FloorData): boolean {
+  const { map, spawn } = data;
+  const sx = Math.floor(spawn.x / TILE);
+  const sy = Math.floor(spawn.y / TILE);
+  let exitX = -1, exitY = -1;
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      if (map[y][x] === T_EXIT) { exitX = x; exitY = y; }
+    }
+  }
+  if (exitX < 0) return false;
+  return bfsCanReach(map, sx, sy, exitX - 1, exitY);
 }
