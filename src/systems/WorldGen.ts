@@ -16,6 +16,43 @@ export interface FloorData {
   rng: () => number;
 }
 
+
+function bfsCanReach(m: number[][], sx: number, sy: number, tx: number, ty: number): boolean {
+  const seen = new Set<string>();
+  const q: Array<[number, number]> = [[sx, sy]];
+  seen.add(sx + ',' + sy);
+  while (q.length) {
+    const cell = q.shift()!;
+    const x = cell[0], y = cell[1];
+    if (x === tx && y === ty) return true;
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) continue;
+      const k = nx + ',' + ny;
+      if (seen.has(k)) continue;
+      const t = m[ny][nx];
+      if (t === T_WALL || t === T_CHAIR) continue;
+      seen.add(k);
+      q.push([nx, ny]);
+    }
+  }
+  return false;
+}
+
+function ensureConnected(m: number[][]): void {
+  const exitY = Math.floor(ROWS / 2);
+  const exitX = COLS - 2; // floor cell adjacent to the exit tile
+  if (bfsCanReach(m, 1, 1, exitX, exitY)) return;
+  // Fallback: carve a guaranteed L-shaped corridor.
+  // Down column 1 to exitY, then across row exitY to exitX.
+  for (let y = 1; y <= exitY; y++) {
+    if (m[y][1] !== T_FLOOR) m[y][1] = T_FLOOR;
+  }
+  for (let x = 1; x <= exitX; x++) {
+    if (m[exitY][x] !== T_FLOOR) m[exitY][x] = T_FLOOR;
+  }
+}
+
 export function generateFloor(level: number): FloorData {
   const m: number[][] = [];
   for (let y = 0; y < ROWS; y++) {
@@ -59,5 +96,6 @@ export function generateFloor(level: number): FloorData {
   m[1][1] = T_FLOOR;
   m[1][2] = T_FLOOR;
   m[2][1] = T_FLOOR;
+  ensureConnected(m);
   return { map: m, rng };
 }
