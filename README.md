@@ -6,7 +6,7 @@ A browser-based top-down twin-stick shooter in the spirit of Hotline Miami. You 
 
 ## Stack
 
-- **Phaser 3** game engine
+- **Phaser 4** game engine
 - **Vite** for the build (`npm run dev` / `npm run build`)
 - **GitHub Actions** builds & deploys to GitHub Pages on every push to `main`
 - **Kenney CC0** sprite art (`assets/KENNEY_LICENSE.txt`)
