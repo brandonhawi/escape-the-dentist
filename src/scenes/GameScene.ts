@@ -426,14 +426,13 @@ export default class GameScene extends Phaser.Scene {
       const a = p.rotation;
       const sp = 520;
       const b = this.add.rectangle(p.x + Math.cos(a) * 16, p.y + Math.sin(a) * 16, 8, 4, WEAPONS[p.weapon].col) as Bullet;
-      this.physics.add.existing(b);
+      this.bulletGroup.add(b);
       b.body.setVelocity(Math.cos(a) * sp, Math.sin(a) * sp);
       b.body.setAllowGravity(false);
       b.from = 'player';
       b.life = 0.7;
       b.thrown = p.weapon;
       b.r = 5;
-      this.bulletGroup.add(b);
       p.weapon = 'fists'; p.ammo = 0;
       this.sfxSwing();
       this.game.events.emit('hud', this.hudState());
@@ -459,12 +458,11 @@ export default class GameScene extends Phaser.Scene {
       const spread = w.spread ?? 0.02;
       const a = p.rotation + (Math.random() - 0.5) * spread;
       const b = this.add.rectangle(p.x + Math.cos(a) * 16, p.y + Math.sin(a) * 16, 6, 3, w.col) as Bullet;
-      this.physics.add.existing(b);
+      this.bulletGroup.add(b);
       b.body.setVelocity(Math.cos(a) * w.speed!, Math.sin(a) * w.speed!);
       b.body.setAllowGravity(false);
       b.from = 'player';
       b.r = 3;
-      this.bulletGroup.add(b);
       p.cd = w.cd;
       this.cameras.main.shake(40, 0.003);
       this.sfxShoot();
@@ -523,12 +521,11 @@ export default class GameScene extends Phaser.Scene {
           if (w.type === 'ranged') {
             const a = e.rotation + (Math.random() - 0.5) * (w.spread ?? 0.12);
             const b = this.add.rectangle(e.x + Math.cos(a) * 16, e.y + Math.sin(a) * 16, 6, 3, w.col) as Bullet;
-            this.physics.add.existing(b);
+            this.bulletGroup.add(b);
             b.body.setVelocity(Math.cos(a) * w.speed!, Math.sin(a) * w.speed!);
             b.body.setAllowGravity(false);
             b.from = 'enemy';
             b.r = 3;
-            this.bulletGroup.add(b);
             e.cd = w.cd + Math.random() * 0.1;
             this.sfxShoot();
           } else {
