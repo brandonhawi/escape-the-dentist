@@ -1,4 +1,4 @@
-import { COLS, ROWS, T_FLOOR, T_WALL, T_EXIT, T_CHAIR } from '../config.ts';
+import { TILE, COLS, ROWS, T_FLOOR, T_WALL, T_EXIT, T_CHAIR } from '../config.ts';
 
 function mulberry32(a: number): () => number {
   return function (): number {
@@ -14,9 +14,8 @@ function mulberry32(a: number): () => number {
 export interface FloorData {
   map: number[][];
   rng: () => number;
+  spawn: { x: number; y: number };
 }
-
-// ---------- BSP dungeon (Rogue-style; sibling-subtree corridors guarantee connectivity) ----------
 
 interface BspNode {
   x: number; y: number; w: number; h: number;
@@ -25,22 +24,27 @@ interface BspNode {
   room?: { x: number; y: number; w: number; h: number };
 }
 
-const MIN_LEAF = 5;     // smallest dimension a leaf may have along the split axis
-const ROOM_PAD = 1;     // tiles of leaf padding before the room starts
-const ROOM_SHRINK = 1;  // max extra random shrink per side
+const MIN_LEAF = 5;
+const ROOM_PAD = 1;
+const ROOM_SHRINK = 1;
+
+type SplitOrientation = 'horizontal' | 'vertical';
+
+function pickSplitOrientation(node: BspNode, rng: () => number): SplitOrientation | null {
+  const canH = node.h >= MIN_LEAF * 2;
+  const canV = node.w >= MIN_LEAF * 2;
+  if (!canH && !canV) return null;
+  if (node.w > node.h * 1.25 && canV) return 'vertical';
+  if (node.h > node.w * 1.25 && canH) return 'horizontal';
+  return canH && (!canV || rng() < 0.5) ? 'horizontal' : 'vertical';
+}
 
 function splitBsp(node: BspNode, rng: () => number, depth: number): void {
   if (depth <= 0) return;
-  const canSplitH = node.h >= MIN_LEAF * 2;
-  const canSplitV = node.w >= MIN_LEAF * 2;
-  if (!canSplitH && !canSplitV) return;
-  // bias: split along the longer axis
-  let splitH: boolean;
-  if (node.w > node.h * 1.25 && canSplitV) splitH = false;
-  else if (node.h > node.w * 1.25 && canSplitH) splitH = true;
-  else splitH = canSplitH && (!canSplitV || rng() < 0.5);
+  const orient = pickSplitOrientation(node, rng);
+  if (orient === null) return;
 
-  if (splitH) {
+  if (orient === 'horizontal') {
     const split = MIN_LEAF + Math.floor(rng() * (node.h - MIN_LEAF * 2 + 1));
     node.left  = { x: node.x, y: node.y,           w: node.w, h: split           };
     node.right = { x: node.x, y: node.y + split,   w: node.w, h: node.h - split  };
@@ -59,7 +63,6 @@ function placeRooms(node: BspNode, m: number[][], rng: () => number): void {
     if (node.right) placeRooms(node.right, m, rng);
     return;
   }
-  // leaf
   const padL = ROOM_PAD + Math.floor(rng() * (ROOM_SHRINK + 1));
   const padR = ROOM_PAD + Math.floor(rng() * (ROOM_SHRINK + 1));
   const padT = ROOM_PAD + Math.floor(rng() * (ROOM_SHRINK + 1));
@@ -76,7 +79,6 @@ function placeRooms(node: BspNode, m: number[][], rng: () => number): void {
   }
 }
 
-// Pick a random cell inside a leaf's room (or recurse into a random descendant for an internal node).
 function pickAnchor(node: BspNode, rng: () => number): { x: number; y: number } {
   if (node.room) {
     const r = node.room;
@@ -85,13 +87,11 @@ function pickAnchor(node: BspNode, rng: () => number): { x: number; y: number } 
       y: r.y + 1 + Math.floor(rng() * Math.max(1, r.h - 2)),
     };
   }
-  // internal node: drop into either child uniformly
   const side = rng() < 0.5 ? node.left! : node.right!;
   return pickAnchor(side, rng);
 }
 
 function carveCorridor(m: number[][], ax: number, ay: number, bx: number, by: number, rng: () => number): void {
-  // L-shape, randomly choose elbow direction (horizontal-first or vertical-first)
   const horizontalFirst = rng() < 0.5;
   if (horizontalFirst) {
     const xLo = Math.min(ax, bx), xHi = Math.max(ax, bx);
@@ -115,14 +115,12 @@ function connectSiblings(node: BspNode, m: number[][], rng: () => number): void 
   carveCorridor(m, a.x, a.y, b.x, b.y, rng);
 }
 
-// Collect all leaf rooms in BSP order.
 function collectRooms(node: BspNode, out: Array<{ x: number; y: number; w: number; h: number }>): void {
   if (node.room) { out.push(node.room); return; }
   if (node.left)  collectRooms(node.left,  out);
   if (node.right) collectRooms(node.right, out);
 }
 
-// BFS reachability used as a final paranoia check.
 function bfsCanReach(m: number[][], sx: number, sy: number, tx: number, ty: number): boolean {
   const seen = new Set<string>();
   const q: Array<[number, number]> = [[sx, sy]];
@@ -146,7 +144,6 @@ function bfsCanReach(m: number[][], sx: number, sy: number, tx: number, ty: numb
 }
 
 export function generateFloor(level: number): FloorData {
-  // Start fully walled in.
   const m: number[][] = [];
   for (let y = 0; y < ROWS; y++) {
     const row: number[] = [];
@@ -155,34 +152,24 @@ export function generateFloor(level: number): FloorData {
   }
   const rng = mulberry32(0x5eed + level * 97);
 
-  // Build BSP within the playable interior (leave the 1-tile border as walls).
   const root: BspNode = { x: 1, y: 1, w: COLS - 2, h: ROWS - 2 };
-  // Depth scales mildly with floor — more rooms on later floors.
   const depth = 3 + Math.min(2, Math.floor((level - 1) / 2));
   splitBsp(root, rng, depth);
   placeRooms(root, m, rng);
   connectSiblings(root, m, rng);
 
-  // Reserve spawn area in the top-left leaf room (so the player's fixed
-  // (TILE*1.5, TILE*1.5) spawn always lands on floor and connects in).
   const rooms: Array<{ x: number; y: number; w: number; h: number }> = [];
   collectRooms(root, rooms);
-  // Find the room closest to (1, 1)
   let spawnRoom = rooms[0];
   let bestSpawnD = Infinity;
   for (const r of rooms) {
     const d = Math.abs(r.x - 1) + Math.abs(r.y - 1);
     if (d < bestSpawnD) { bestSpawnD = d; spawnRoom = r; }
   }
-  // Carve a short corridor from (1,1) into the spawn room.
-  const spawnX = spawnRoom.x + Math.floor(spawnRoom.w / 2);
-  const spawnY = spawnRoom.y + Math.floor(spawnRoom.h / 2);
-  carveCorridor(m, 1, 1, spawnX, spawnY, rng);
-  m[1][1] = T_FLOOR;
-  m[1][2] = T_FLOOR;
-  m[2][1] = T_FLOOR;
+  const spawnTx = spawnRoom.x + Math.floor(spawnRoom.w / 2);
+  const spawnTy = spawnRoom.y + Math.floor(spawnRoom.h / 2);
+  const spawn = { x: spawnTx * TILE + TILE / 2, y: spawnTy * TILE + TILE / 2 };
 
-  // Place the exit on the right edge in the row of whichever room is rightmost.
   let exitRoom = rooms[0];
   let bestRight = -Infinity;
   for (const r of rooms) {
@@ -190,11 +177,9 @@ export function generateFloor(level: number): FloorData {
     if (rightEdge > bestRight) { bestRight = rightEdge; exitRoom = r; }
   }
   const exitY = exitRoom.y + Math.floor(exitRoom.h / 2);
-  // Carve from the rightmost room out to the boundary tile.
   for (let x = exitRoom.x + exitRoom.w; x < COLS - 1; x++) m[exitY][x] = T_FLOOR;
   m[exitY][COLS - 1] = T_EXIT;
 
-  // Scatter dental chairs as room-interior decorations (never on corridors).
   const chairCount = 2 + level;
   for (let i = 0; i < chairCount; i++) {
     const r = rooms[Math.floor(rng() * rooms.length)];
@@ -204,12 +189,19 @@ export function generateFloor(level: number): FloorData {
     if (m[cy][cx] === T_FLOOR) m[cy][cx] = T_CHAIR;
   }
 
-  // Paranoia check: BFS from spawn to the floor cell adjacent to exit.
-  // Sibling-corridor BSP guarantees this, but assert anyway so any
-  // future regression is loud.
-  if (!bfsCanReach(m, 1, 1, COLS - 2, exitY)) {
-    console.error('[WorldGen] BSP produced unreachable exit on level', level);
-  }
+  return { map: m, rng, spawn };
+}
 
-  return { map: m, rng };
+export function isFloorConnected(data: FloorData): boolean {
+  const { map, spawn } = data;
+  const sx = Math.floor(spawn.x / TILE);
+  const sy = Math.floor(spawn.y / TILE);
+  let exitX = -1, exitY = -1;
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      if (map[y][x] === T_EXIT) { exitX = x; exitY = y; }
+    }
+  }
+  if (exitX < 0) return false;
+  return bfsCanReach(map, sx, sy, exitX - 1, exitY);
 }
