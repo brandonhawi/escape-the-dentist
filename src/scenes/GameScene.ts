@@ -4,7 +4,8 @@ import {
   GAME_W, GAME_H, type WeaponKey,
 } from '../config.ts';
 import { generateFloor } from '../systems/WorldGen.ts';
-import type { Player, Enemy, Bullet, Pickup, HudState } from '../types.ts';
+import type { Bullet, Pickup, HudState } from '../types.ts';
+import { Player, Enemy, type EnemyKind } from '../entities/Character.ts';
 
 const MAX_LEVEL = 5;
 
@@ -149,20 +150,7 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    const playerSprite = this.physics.add.sprite(TILE * 1.5, TILE * 1.5, 'player') as Player;
-    playerSprite.setDisplaySize(36, 32);
-    playerSprite.body!.setCircle(playerSprite.width / 2, 0, (playerSprite.height - playerSprite.width) / 2);
-    playerSprite.setCollideWorldBounds(true);
-    playerSprite.weapon = 'fists';
-    playerSprite.ammo = 0;
-    playerSprite.cd = 0;
-    playerSprite.dashCd = 0;
-    playerSprite.dashT = 0;
-    playerSprite.dashDx = 0;
-    playerSprite.dashDy = 0;
-    playerSprite.swingT = 0;
-    playerSprite.alive = true;
-    this.player = playerSprite;
+    this.player = new Player(this, TILE * 1.5, TILE * 1.5);
 
     this.weaponGfx = this.add.graphics();
 
@@ -177,7 +165,7 @@ export default class GameScene extends Phaser.Scene {
       if (Phaser.Math.Distance.Between(ex, ey, this.player.x, this.player.y) < 220) continue;
       const roll = rng();
       let weapon: WeaponKey;
-      let kind: 'normal' | 'fast' = 'normal';
+      let kind: EnemyKind = 'normal';
       if (roll < 0.35) weapon = 'fists';
       else if (roll < 0.55) { weapon = 'drill'; kind = 'fast'; }
       else if (roll < 0.75) weapon = 'pistol';
@@ -202,7 +190,7 @@ export default class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.chairGroup);
     this.physics.add.collider(this.enemyGroup, this.wallGroup);
     this.physics.add.collider(this.enemyGroup, this.chairGroup);
-    this.physics.add.collider(this.enemyGroup, this.enemyGroup);
+    // (no enemy-vs-enemy collider: bouncing produces wall-vibration; see PR #8)
     this.physics.add.overlap(this.player, this.exitGroup, () => this.advanceFloor());
     this.physics.add.overlap(this.player, this.pickupGroup,
       ((_p: Phaser.Types.Physics.Arcade.GameObjectWithBody, it: Phaser.Types.Physics.Arcade.GameObjectWithBody) =>
@@ -261,22 +249,9 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  spawnEnemy(x: number, y: number, kind: 'normal' | 'fast', weapon: WeaponKey): Enemy {
-    const tex = kind === 'fast' ? 'fast' : 'dentist';
-    const e = this.physics.add.sprite(x, y, tex) as Enemy;
-    e.setDisplaySize(36, 32);
-    e.body!.setCircle(e.width / 2, 0, (e.height - e.width) / 2);
-    e.weapon = weapon;
+  spawnEnemy(x: number, y: number, kind: EnemyKind, weapon: WeaponKey): Enemy {
+    const e = new Enemy(this, x, y, kind, weapon);
     e.ammo = WEAPONS[weapon].ammo ?? 0;
-    e.cd = Math.random() * 0.5;
-    e.kind = kind;
-    e.alive = true;
-    e.speed = kind === 'fast' ? 170 : 110;
-    e.seePlayer = false;
-    e.reactT = 0.2 + Math.random() * 0.3;
-    e.wanderT = 0;
-    e.wanderVx = 0;
-    e.wanderVy = 0;
     this.enemyGroup.add(e);
     return e;
   }
