@@ -626,6 +626,8 @@ function render() {
   ctx.fillStyle = '#1d0030';
   ctx.fillRect(0,0,W,H);
 
+  if (!game.map) { ctx.restore(); return; }
+
   // tile pattern
   for (let y=0; y<ROWS; y++) {
     for (let x=0; x<COLS; x++) {
@@ -856,8 +858,7 @@ function loop(now) {
   }
 
   mouse.clicked = false;
-  render();
-  updateHud();
+  try { render(); updateHud(); } catch (err) { console.error('render error', err); }
   requestAnimationFrame(loop);
 }
 
