@@ -46,6 +46,12 @@
     box-shadow: 0 0 20px #ff2e88;
   }
   #title button:hover { background: #00f0ff; color: #15001f; box-shadow: 0 0 24px #00f0ff; }
+  #controls {
+    position: absolute; left: 12px; bottom: 10px;
+    text-shadow: 0 0 4px #ff00aa;
+    font-size: 11px; letter-spacing: 1px; color: #9be7ff;
+    opacity: 0.75; pointer-events: none;
+  }
   #toast {
     position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%);
     color: #ffe44a; text-shadow: 0 0 8px #ff2e88;
@@ -59,6 +65,7 @@
 <div id="wrap">
   <canvas id="game" width="960" height="600"></canvas>
   <div id="hud"></div>
+  <div id="controls">WASD move &nbsp;·&nbsp; MOUSE aim &nbsp;·&nbsp; LMB attack &nbsp;·&nbsp; E pickup &nbsp;·&nbsp; R throw &nbsp;·&nbsp; SPACE dash &nbsp;·&nbsp; P pause</div>
   <div id="toast"></div>
   <div id="title">
     <h1>ESCAPE THE DENTIST</h1>
@@ -92,6 +99,10 @@ const mouse = { x: W/2, y: H/2, down: false, clicked: false, rDown: false };
 addEventListener('keydown', e => {
   keys[e.key.toLowerCase()] = true;
   if (e.key === ' ') e.preventDefault();
+  if (e.key.toLowerCase() === 'p') {
+    if (game.state === 'play') game.state = 'paused';
+    else if (game.state === 'paused') game.state = 'play';
+  }
 });
 addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
 canvas.addEventListener('mousemove', e => {
@@ -211,86 +222,16 @@ const game = {
   t: 0,
 };
 
-// ---------- hand-drawn pixel sprites ----------
-// 16x16, character facing +x (right). Rendered chunky at 32x32.
-const SPRITE_PAL = {
-  '.': null,
-  'K': '#1a0028', 'H': '#2a1808', 'h': '#4a2c14',
-  'S': '#f5c896', 's': '#c89060', 'E': '#15001f',
-  'G': '#00d8ff', 'g': '#009ec8',
-  'W': '#f0f0f5', 'w': '#b8b8c8',
-  'B': '#5ad0ff', 'b': '#2a90c0',
-  'P': '#ff7ac6', 'p': '#c0408a',
-  'R': '#ff2e88', 'Y': '#ffe44a',
-  'M': '#d8d8e0', 'm': '#707080',
-};
-function makeSprite(rows) {
-  const w = rows[0].length, h = rows.length;
-  const cv = document.createElement('canvas');
-  cv.width = w; cv.height = h;
-  const c = cv.getContext('2d');
-  for (let y=0; y<h; y++) for (let x=0; x<w; x++) {
-    const col = SPRITE_PAL[rows[y][x]];
-    if (col) { c.fillStyle = col; c.fillRect(x, y, 1, 1); }
-  }
-  return cv;
+// ---------- sprites (Kenney top-down shooter pack, CC0) ----------
+const SPRITES = { player: null, dentist: null, fast: null };
+function loadSprite(key, url) {
+  const img = new Image();
+  img.onload = () => { SPRITES[key] = img; };
+  img.src = url;
 }
-const SPRITES = {
-  player: makeSprite([
-    "................",
-    "......KKKKKK....",
-    ".....KGGGGGGK...",
-    "....KGGGGGGGGK..",
-    "...KGKHHHHHHSGK.",
-    "..KGKHHEHHESSGK.",
-    "..KGKHHhhhhhSSGK",
-    ".KGKHHhhhhhSSSGK",
-    ".KGKHHhhhhhSSSGK",
-    "..KGKHHhhhhhSSGK",
-    "..KGKHHEHHESSGK.",
-    "...KGKHHHHHHSGK.",
-    "....KGGGGGGGGK..",
-    ".....KGGGGGGK...",
-    "......KKKKKK....",
-    "................",
-  ]),
-  dentist: makeSprite([
-    "................",
-    "......KKKKKK....",
-    ".....KWWWWWWK...",
-    "....KWWWWWWWWK..",
-    "...KWKBBBBBBSWK.",
-    "..KWKBBEBBEBbWK.",
-    "..KWKBBbbbbbBbWK",
-    ".KWKBBbbbbbbBbWK",
-    ".KWKBBbbbbbbBbWK",
-    "..KWKBBbbbbbBbWK",
-    "..KWKBBEBBEBbWK.",
-    "...KWKBBBBBBSWK.",
-    "....KWWWWWWWWK..",
-    ".....KWWWWWWK...",
-    "......KKKKKK....",
-    "................",
-  ]),
-  fast: makeSprite([
-    "................",
-    "......KKKKKK....",
-    ".....KPPPPPPK...",
-    "....KPPPPPPPPK..",
-    "...KPKBBBBBBSPK.",
-    "..KPKBBEBBEBbPK.",
-    "..KPKBBbbbbbBbPK",
-    ".KPKBBbbbbbbBbPK",
-    ".KPKBBbbbbbbBbPK",
-    "..KPKBBbbbbbBbPK",
-    "..KPKBBEBBEBbPK.",
-    "...KPKBBBBBBSPK.",
-    "....KPPPPPPPPK..",
-    ".....KPPPPPPK...",
-    "......KKKKKK....",
-    "................",
-  ]),
-};
+loadSprite('player',  'assets/player.png');
+loadSprite('dentist', 'assets/dentist.png');
+loadSprite('fast',    'assets/dentist_fast.png');
 
 const WEAPONS = {
   fists:   { name:'FISTS',   range: 26, dmg: 1, cd: 0.25, type:'melee', col:'#fff' },
@@ -781,8 +722,14 @@ function render() {
     // shadow
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
     ctx.beginPath(); ctx.ellipse(2, 3, e.r+2, e.r*0.5, 0, 0, Math.PI*2); ctx.fill();
-    // body sprite
-    ctx.drawImage(e.kind === 'fast' ? SPRITES.fast : SPRITES.dentist, -16, -16, 32, 32);
+    // body sprite (Kenney)
+    const espr = e.kind === 'fast' ? SPRITES.fast : SPRITES.dentist;
+    if (espr) {
+      ctx.drawImage(espr, -18, -16, 36, 32);
+    } else {
+      ctx.fillStyle = e.kind === 'fast' ? '#ff7ac6' : '#e8f0ff';
+      ctx.beginPath(); ctx.arc(0, 0, e.r, 0, Math.PI*2); ctx.fill();
+    }
     // weapon
     const w = WEAPONS[e.weapon];
     ctx.fillStyle = w.col;
@@ -824,23 +771,42 @@ function render() {
     // shadow
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
     ctx.beginPath(); ctx.ellipse(2, 3, p.r+2, p.r*0.5, 0, 0, Math.PI*2); ctx.fill();
-    // body sprite
-    ctx.drawImage(SPRITES.player, -16, -16, 32, 32);
+    // body sprite (Kenney) — scale to player diameter*1.5
+    if (SPRITES.player) {
+      ctx.drawImage(SPRITES.player, -18, -16, 36, 32);
+    } else {
+      ctx.fillStyle = '#00f0ff';
+      ctx.beginPath(); ctx.arc(0, 0, p.r, 0, Math.PI*2); ctx.fill();
+    }
     // weapon
     const w = WEAPONS[p.weapon];
     ctx.fillStyle = w.col;
     if (w.type === 'ranged') {
       ctx.fillRect(8, -2, 14, 4);
-      // muzzle flash
-      if (p.cd > w.cd - 0.04) {
+      // muzzle flash (brighter, larger, longer-lasting)
+      if (p.cd > w.cd - 0.07) {
+        const flashLife = (p.cd - (w.cd - 0.07)) / 0.07;
         ctx.fillStyle = '#ffe44a';
-        ctx.beginPath(); ctx.arc(22, 0, 5, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = flashLife;
+        ctx.beginPath(); ctx.arc(24, 0, 7 + flashLife*4, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(24, 0, 3 + flashLife*2, 0, Math.PI*2); ctx.fill();
+        ctx.globalAlpha = 1;
       }
     } else {
-      // melee — swing visual
-      const swing = p._swingT > 0 ? (1 - p._swingT/0.12) : 1;
-      const len = w.range * (0.5 + swing*0.5);
+      // melee — weapon stick + visible swing arc
+      const swing = p._swingT > 0 ? (1 - p._swingT/0.12) : 0;
+      const len = w.range * (0.5 + (p._swingT > 0 ? 0.7 : 0.3));
       ctx.fillRect(8, -2, len, 4);
+      if (p._swingT > 0) {
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3;
+        ctx.globalAlpha = swing;
+        ctx.beginPath();
+        ctx.arc(6, 0, w.range*0.9, -1.0, 1.0);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
     }
     ctx.restore();
 
@@ -884,6 +850,16 @@ function render() {
     ctx.font = '18px monospace';
     ctx.fillText('PRESS [ENTER] TO TRY AGAIN', W/2, H/2 + 30);
     ctx.fillText(`Floor ${game.level} • Kills ${game.totalKills}`, W/2, H/2 + 56);
+  } else if (game.state === 'paused') {
+    ctx.fillStyle = 'rgba(10, 0, 20, 0.55)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#ffe44a';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 56px monospace';
+    ctx.fillText('PAUSED', W/2, H/2 - 4);
+    ctx.fillStyle = '#9be7ff';
+    ctx.font = '16px monospace';
+    ctx.fillText('PRESS [P] TO RESUME', W/2, H/2 + 30);
   } else if (game.state === 'win') {
     ctx.fillStyle = 'rgba(20, 0, 30, 0.8)';
     ctx.fillRect(0, 0, W, H);
@@ -920,6 +896,8 @@ function loop(now) {
     updateEnemies(dt);
     updateBullets(dt);
     updateParticles(dt);
+  } else if (game.state === 'paused') {
+    // frozen
   } else {
     updateParticles(dt);
     if (keys['enter']) {
