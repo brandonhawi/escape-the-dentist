@@ -7,6 +7,7 @@ A browser-based top-down twin-stick shooter in the spirit of Hotline Miami. You 
 ## Stack
 
 - **Phaser 4** game engine
+- **TypeScript 6** (strict mode, run via Vite + esbuild)
 - **Vite** for the build (`npm run dev` / `npm run build`)
 - **GitHub Actions** builds & deploys to GitHub Pages on every push to `main`
 - **Kenney CC0** sprite art (`assets/KENNEY_LICENSE.txt`)
@@ -16,6 +17,7 @@ A browser-based top-down twin-stick shooter in the spirit of Hotline Miami. You 
 ```bash
 npm install
 npm run dev      # Vite dev server on :5173
+npm run typecheck # tsc --noEmit
 npm run build    # → dist/
 npm run preview  # serve the built bundle
 ```
@@ -27,16 +29,16 @@ escape-the-dentist/
 ├─ index.html              # Vite entry, mounts Phaser into #game
 ├─ public/assets/          # static sprite PNGs (CC0 Kenney)
 ├─ src/
-│  ├─ main.js              # Phaser.Game config + scene list
-│  ├─ config.js            # constants, weapon table, tile codes
+│  ├─ main.ts              # Phaser.Game config + scene list
+│  ├─ config.ts            # constants, weapon table, tile codes
 │  ├─ scenes/
-│  │  ├─ BootScene.js      # preload sprites
-│  │  ├─ TitleScene.js     # title screen + START
-│  │  ├─ GameScene.js      # gameplay loop, AI, physics, attacks
-│  │  ├─ UIScene.js        # HUD + controls strip + toast
-│  │  └─ OverlayScene.js   # paused / dead / win overlays
+│  │  ├─ BootScene.ts      # preload sprites
+│  │  ├─ TitleScene.ts     # title screen + START
+│  │  ├─ GameScene.ts      # gameplay loop, AI, physics, attacks
+│  │  ├─ UIScene.ts        # HUD + controls strip + toast
+│  │  └─ OverlayScene.ts   # paused / dead / win overlays
 │  └─ systems/
-│     └─ WorldGen.js       # procedural floor generation
+│     └─ WorldGen.ts       # procedural floor generation
 └─ .github/workflows/deploy.yml
 ```
 

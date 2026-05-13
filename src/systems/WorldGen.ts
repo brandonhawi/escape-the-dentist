@@ -1,21 +1,27 @@
-import { COLS, ROWS, T_FLOOR, T_WALL, T_EXIT, T_CHAIR } from '../config.js';
+import { COLS, ROWS, T_FLOOR, T_WALL, T_EXIT, T_CHAIR } from '../config.ts';
 
-function mulberry32(a) {
-  return function() {
-    a |= 0; a = a + 0x6D2B79F5 | 0;
+function mulberry32(a: number): () => number {
+  return function (): number {
+    a |= 0;
+    a = (a + 0x6D2B79F5) | 0;
     let t = a;
-    t = Math.imul(t ^ t >>> 15, t | 1);
-    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
 
-export function generateFloor(level) {
-  const m = [];
+export interface FloorData {
+  map: number[][];
+  rng: () => number;
+}
+
+export function generateFloor(level: number): FloorData {
+  const m: number[][] = [];
   for (let y = 0; y < ROWS; y++) {
-    const row = [];
+    const row: number[] = [];
     for (let x = 0; x < COLS; x++) {
-      if (x === 0 || y === 0 || x === COLS-1 || y === ROWS-1) row.push(T_WALL);
+      if (x === 0 || y === 0 || x === COLS - 1 || y === ROWS - 1) row.push(T_WALL);
       else row.push(T_FLOOR);
     }
     m.push(row);
@@ -50,6 +56,8 @@ export function generateFloor(level) {
   const dy = Math.floor(ROWS / 2);
   m[dy][COLS - 1] = T_EXIT;
   m[dy][COLS - 2] = T_FLOOR;
-  m[1][1] = T_FLOOR; m[1][2] = T_FLOOR; m[2][1] = T_FLOOR;
+  m[1][1] = T_FLOOR;
+  m[1][2] = T_FLOOR;
+  m[2][1] = T_FLOOR;
   return { map: m, rng };
 }

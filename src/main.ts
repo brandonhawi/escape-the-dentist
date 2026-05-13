@@ -1,10 +1,10 @@
 import Phaser from 'phaser';
-import { GAME_W, GAME_H } from './config.js';
-import BootScene from './scenes/BootScene.js';
-import TitleScene from './scenes/TitleScene.js';
-import GameScene from './scenes/GameScene.js';
-import UIScene from './scenes/UIScene.js';
-import OverlayScene from './scenes/OverlayScene.js';
+import { GAME_W, GAME_H } from './config.ts';
+import BootScene from './scenes/BootScene.ts';
+import TitleScene from './scenes/TitleScene.ts';
+import GameScene from './scenes/GameScene.ts';
+import UIScene from './scenes/UIScene.ts';
+import OverlayScene from './scenes/OverlayScene.ts';
 
 new Phaser.Game({
   type: Phaser.AUTO,
