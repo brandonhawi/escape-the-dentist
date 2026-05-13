@@ -151,7 +151,15 @@ export default class GameScene extends Phaser.Scene {
 
     const playerSprite = this.physics.add.sprite(TILE * 1.5, TILE * 1.5, 'player') as Player;
     playerSprite.setDisplaySize(36, 32);
-    playerSprite.body!.setCircle(playerSprite.width / 2, 0, (playerSprite.height - playerSprite.width) / 2);
+    // Use a body sized to the displayed sprite. Circle bodies don't scale cleanly
+    // on a non-square texture (33x43 -> 36x32) — the scale mismatch caused the
+    // collision response to desync from the visual, producing wall vibration.
+    {
+      const bw = 24, bh = 24;
+      const body = playerSprite.body as Phaser.Physics.Arcade.Body;
+      body.setSize(bw, bh);
+      body.setOffset((playerSprite.width - bw) / 2, (playerSprite.height - bh) / 2);
+    }
     playerSprite.setCollideWorldBounds(true);
     playerSprite.weapon = 'fists';
     playerSprite.ammo = 0;
@@ -202,7 +210,7 @@ export default class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.chairGroup);
     this.physics.add.collider(this.enemyGroup, this.wallGroup);
     this.physics.add.collider(this.enemyGroup, this.chairGroup);
-    this.physics.add.collider(this.enemyGroup, this.enemyGroup);
+    // (intentionally no enemy-vs-enemy collider: bouncing produced wall vibration)
     this.physics.add.overlap(this.player, this.exitGroup, () => this.advanceFloor());
     this.physics.add.overlap(this.player, this.pickupGroup,
       ((_p: Phaser.Types.Physics.Arcade.GameObjectWithBody, it: Phaser.Types.Physics.Arcade.GameObjectWithBody) =>
@@ -265,7 +273,12 @@ export default class GameScene extends Phaser.Scene {
     const tex = kind === 'fast' ? 'fast' : 'dentist';
     const e = this.physics.add.sprite(x, y, tex) as Enemy;
     e.setDisplaySize(36, 32);
-    e.body!.setCircle(e.width / 2, 0, (e.height - e.width) / 2);
+    {
+      const bw = 24, bh = 24;
+      const body = e.body as Phaser.Physics.Arcade.Body;
+      body.setSize(bw, bh);
+      body.setOffset((e.width - bw) / 2, (e.height - bh) / 2);
+    }
     e.weapon = weapon;
     e.ammo = WEAPONS[weapon].ammo ?? 0;
     e.cd = Math.random() * 0.5;
