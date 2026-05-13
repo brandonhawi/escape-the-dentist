@@ -1,4 +1,4 @@
-import { COLS, ROWS, T_FLOOR, T_WALL, T_EXIT, T_CHAIR } from '../config.ts';
+import { TILE, COLS, ROWS, T_FLOOR, T_WALL, T_EXIT, T_CHAIR } from '../config.ts';
 
 function mulberry32(a: number): () => number {
   return function (): number {
@@ -14,9 +14,8 @@ function mulberry32(a: number): () => number {
 export interface FloorData {
   map: number[][];
   rng: () => number;
+  spawn: { x: number; y: number };
 }
-
-// ---------- BSP dungeon (Rogue-style; sibling-subtree corridors guarantee connectivity) ----------
 
 interface BspNode {
   x: number; y: number; w: number; h: number;
@@ -163,26 +162,18 @@ export function generateFloor(level: number): FloorData {
   placeRooms(root, m, rng);
   connectSiblings(root, m, rng);
 
-  // Reserve spawn area in the top-left leaf room (so the player's fixed
-  // (TILE*1.5, TILE*1.5) spawn always lands on floor and connects in).
   const rooms: Array<{ x: number; y: number; w: number; h: number }> = [];
   collectRooms(root, rooms);
-  // Find the room closest to (1, 1)
   let spawnRoom = rooms[0];
   let bestSpawnD = Infinity;
   for (const r of rooms) {
     const d = Math.abs(r.x - 1) + Math.abs(r.y - 1);
     if (d < bestSpawnD) { bestSpawnD = d; spawnRoom = r; }
   }
-  // Carve a short corridor from (1,1) into the spawn room.
-  const spawnX = spawnRoom.x + Math.floor(spawnRoom.w / 2);
-  const spawnY = spawnRoom.y + Math.floor(spawnRoom.h / 2);
-  carveCorridor(m, 1, 1, spawnX, spawnY, rng);
-  m[1][1] = T_FLOOR;
-  m[1][2] = T_FLOOR;
-  m[2][1] = T_FLOOR;
+  const spawnTx = spawnRoom.x + Math.floor(spawnRoom.w / 2);
+  const spawnTy = spawnRoom.y + Math.floor(spawnRoom.h / 2);
+  const spawn = { x: spawnTx * TILE + TILE / 2, y: spawnTy * TILE + TILE / 2 };
 
-  // Place the exit on the right edge in the row of whichever room is rightmost.
   let exitRoom = rooms[0];
   let bestRight = -Infinity;
   for (const r of rooms) {
@@ -190,11 +181,9 @@ export function generateFloor(level: number): FloorData {
     if (rightEdge > bestRight) { bestRight = rightEdge; exitRoom = r; }
   }
   const exitY = exitRoom.y + Math.floor(exitRoom.h / 2);
-  // Carve from the rightmost room out to the boundary tile.
   for (let x = exitRoom.x + exitRoom.w; x < COLS - 1; x++) m[exitY][x] = T_FLOOR;
   m[exitY][COLS - 1] = T_EXIT;
 
-  // Scatter dental chairs as room-interior decorations (never on corridors).
   const chairCount = 2 + level;
   for (let i = 0; i < chairCount; i++) {
     const r = rooms[Math.floor(rng() * rooms.length)];
@@ -207,9 +196,9 @@ export function generateFloor(level: number): FloorData {
   // Paranoia check: BFS from spawn to the floor cell adjacent to exit.
   // Sibling-corridor BSP guarantees this, but assert anyway so any
   // future regression is loud.
-  if (!bfsCanReach(m, 1, 1, COLS - 2, exitY)) {
+  if (!bfsCanReach(m, spawnTx, spawnTy, COLS - 2, exitY)) {
     console.error('[WorldGen] BSP produced unreachable exit on level', level);
   }
 
-  return { map: m, rng };
+  return { map: m, rng, spawn };
 }

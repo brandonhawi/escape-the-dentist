@@ -97,7 +97,7 @@ export default class GameScene extends Phaser.Scene {
     this.decalLayer.removeAll(true);
     this.fxLayer.removeAll(true);
 
-    const { map, rng } = generateFloor(level);
+    const { map, rng, spawn } = generateFloor(level);
     this.map = map;
 
     this.tileGfx = this.add.graphics();
@@ -123,7 +123,7 @@ export default class GameScene extends Phaser.Scene {
       }
     }
 
-    this.player = new Player(this, TILE * 1.5, TILE * 1.5);
+    this.player = new Player(this, spawn.x, spawn.y);
 
     this.weaponGfx = this.add.graphics();
 
