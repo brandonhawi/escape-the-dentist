@@ -6,6 +6,8 @@ import {
 import { generateFloor } from '../systems/WorldGen.ts';
 import type { Bullet, Pickup, HudState } from '../types.ts';
 import { Player, Enemy, type EnemyKind } from '../entities/Character.ts';
+import { Audio } from '../systems/Audio.ts';
+import { drawTiles } from '../systems/WorldRenderer.ts';
 
 const MAX_LEVEL = 5;
 
@@ -38,7 +40,7 @@ export default class GameScene extends Phaser.Scene {
   keys!: Keys;
   player!: Player;
   map!: number[][];
-  ac: AudioContext | null = null;
+  audio = new Audio();
   private _advancing = false;
 
   constructor() { super('Game'); }
@@ -75,40 +77,11 @@ export default class GameScene extends Phaser.Scene {
       }
     });
 
-    this.input.once('pointerdown', () => {
-      if (!this.ac) {
-        const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        this.ac = new Ctor();
-      }
-    });
+    this.input.once('pointerdown', () => this.audio.init());
 
     this.startLevel(1);
   }
 
-  // ---- audio ----
-  blip(freq: number, dur = 0.05, type: OscillatorType = 'square', vol = 0.04): void {
-    if (!this.ac) return;
-    const o = this.ac.createOscillator(), g = this.ac.createGain();
-    o.type = type;
-    o.frequency.value = freq;
-    g.gain.value = vol;
-    g.gain.exponentialRampToValueAtTime(0.0001, this.ac.currentTime + dur);
-    o.connect(g).connect(this.ac.destination);
-    o.start();
-    o.stop(this.ac.currentTime + dur);
-  }
-  sfxShoot()  { this.blip(880, 0.05, 'square', 0.04); }
-  sfxHit()    { this.blip(140, 0.18, 'sawtooth', 0.08); }
-  sfxSwing()  { this.blip(420, 0.04, 'triangle', 0.05); }
-  sfxPickup() { this.blip(660, 0.08, 'sine', 0.05); }
-  sfxDash()   { this.blip(220, 0.10, 'triangle', 0.05); }
-  sfxDoor()   { this.blip(1200, 0.20, 'sine', 0.06); }
-  sfxDeath(): void {
-    this.blip(120, 0.40, 'sawtooth', 0.10);
-    setTimeout(() => this.blip(80, 0.4, 'sawtooth', 0.08), 100);
-  }
-
-  // ---- world setup ----
   startLevel(level: number): void {
     this.level = level;
     this.kills = 0;
@@ -128,7 +101,7 @@ export default class GameScene extends Phaser.Scene {
     this.map = map;
 
     this.tileGfx = this.add.graphics();
-    this.drawTiles();
+    drawTiles(this, this.map, this.tileGfx, this.fxLayer);
 
     for (let y = 0; y < ROWS; y++) {
       for (let x = 0; x < COLS; x++) {
@@ -171,7 +144,8 @@ export default class GameScene extends Phaser.Scene {
       else if (roll < 0.75) weapon = 'pistol';
       else if (roll < 0.88) weapon = 'mallet';
       else weapon = level >= 2 ? 'uzi' : 'pistol';
-      this.spawnEnemy(ex, ey, kind, weapon);
+      const _e = new Enemy(this, ex, ey, kind, weapon);
+      this.enemyGroup.add(_e);
       placed++;
     }
 
@@ -190,7 +164,6 @@ export default class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.chairGroup);
     this.physics.add.collider(this.enemyGroup, this.wallGroup);
     this.physics.add.collider(this.enemyGroup, this.chairGroup);
-    // (no enemy-vs-enemy collider: bouncing produces wall-vibration; see PR #8)
     this.physics.add.overlap(this.player, this.exitGroup, () => this.advanceFloor());
     this.physics.add.overlap(this.player, this.pickupGroup,
       ((_p: Phaser.Types.Physics.Arcade.GameObjectWithBody, it: Phaser.Types.Physics.Arcade.GameObjectWithBody) =>
@@ -213,48 +186,7 @@ export default class GameScene extends Phaser.Scene {
     this.time.delayedCall(60, () => this.game.events.emit('hud', this.hudState()));
   }
 
-  drawTiles(): void {
-    const g = this.tileGfx;
-    g.clear();
-    for (let y = 0; y < ROWS; y++) {
-      for (let x = 0; x < COLS; x++) {
-        const t = this.map[y][x];
-        const px = x * TILE, py = y * TILE;
-        if (t === T_FLOOR) {
-          g.fillStyle(((x + y) & 1) ? 0x220040 : 0x1a0030);
-          g.fillRect(px, py, TILE, TILE);
-        } else if (t === T_WALL) {
-          g.fillStyle(0x3a005a); g.fillRect(px, py, TILE, TILE);
-          g.fillStyle(0x5a1090); g.fillRect(px, py, TILE, 3);
-          g.fillStyle(0x1a002a); g.fillRect(px, py + TILE - 3, TILE, 3);
-        } else if (t === T_EXIT) {
-          g.fillStyle(0xffe44a); g.fillRect(px, py, TILE, TILE);
-          g.fillStyle(0x15001f); g.fillRect(px + 8, py + 8, TILE - 16, TILE - 16);
-        } else if (t === T_CHAIR) {
-          g.fillStyle(0x3a005a); g.fillRect(px, py, TILE, TILE);
-          g.fillStyle(0x9be7ff); g.fillRect(px + 6, py + 8, TILE - 12, TILE - 16);
-          g.fillStyle(0x00f0ff); g.fillRect(px + 10, py + 4, TILE - 20, 6);
-        }
-      }
-    }
-    for (let y = 0; y < ROWS; y++) {
-      for (let x = 0; x < COLS; x++) {
-        if (this.map[y][x] === T_EXIT) {
-          const t = this.add.text(x * TILE + TILE / 2, y * TILE + TILE / 2, 'EXIT', {
-            fontFamily: 'Courier New', fontSize: '13px', color: '#ff2e88', fontStyle: 'bold',
-          }).setOrigin(0.5);
-          this.fxLayer.add(t);
-        }
-      }
-    }
-  }
 
-  spawnEnemy(x: number, y: number, kind: EnemyKind, weapon: WeaponKey): Enemy {
-    const e = new Enemy(this, x, y, kind, weapon);
-    e.ammo = WEAPONS[weapon].ammo ?? 0;
-    this.enemyGroup.add(e);
-    return e;
-  }
 
   spawnPickup(x: number, y: number, weapon: WeaponKey, ammo?: number): Pickup {
     const w = WEAPONS[weapon];
@@ -276,7 +208,7 @@ export default class GameScene extends Phaser.Scene {
     p.weapon = it.weapon;
     p.ammo = it.ammo;
     it.destroy();
-    this.sfxPickup();
+    this.audio.pickup();
     const w = WEAPONS[p.weapon];
     this.toast(w.name + (w.type === 'ranged' ? `  [${p.ammo}]` : ''));
     this.game.events.emit('hud', this.hudState());
@@ -294,7 +226,7 @@ export default class GameScene extends Phaser.Scene {
     }
     e.destroy();
     this.cameras.main.shake(120, 0.006);
-    this.sfxHit();
+    this.audio.hit();
     this.game.events.emit('hud', this.hudState());
   }
 
@@ -303,7 +235,7 @@ export default class GameScene extends Phaser.Scene {
     this.player.alive = false;
     this.spawnBlood(this.player.x, this.player.y, 40);
     this.cameras.main.shake(220, 0.012);
-    this.sfxDeath();
+    this.audio.death();
     this.dead = true;
     this.physics.pause();
     this.scene.launch('Overlay', { kind: 'dead', level: this.level, kills: this.totalKills });
@@ -349,7 +281,7 @@ export default class GameScene extends Phaser.Scene {
   advanceFloor(): void {
     if (this._advancing) return;
     this._advancing = true;
-    this.sfxDoor();
+    this.audio.door();
     if (this.level >= MAX_LEVEL) {
       this.physics.pause();
       this.scene.launch('Overlay', { kind: 'win', kills: this.totalKills });
@@ -361,7 +293,6 @@ export default class GameScene extends Phaser.Scene {
     }
   }
 
-  // ---- main loop ----
   update(_time: number, delta: number): void {
     if (this.paused || this.dead || !this.player || !this.player.alive) return;
     const dt = delta / 1000;
@@ -384,7 +315,7 @@ export default class GameScene extends Phaser.Scene {
     if (this.keys.space.isDown && p.dashCd <= 0 && (dx || dy)) {
       p.dashT = 0.16; p.dashCd = 0.7;
       p.dashDx = dx; p.dashDy = dy;
-      this.sfxDash();
+      this.audio.dash();
     }
     let speed = 220;
     if (p.dashT > 0) {
@@ -409,7 +340,7 @@ export default class GameScene extends Phaser.Scene {
       b.thrown = p.weapon;
       b.r = 5;
       p.weapon = 'fists'; p.ammo = 0;
-      this.sfxSwing();
+      this.audio.swing();
       this.game.events.emit('hud', this.hudState());
     }
 
@@ -440,7 +371,7 @@ export default class GameScene extends Phaser.Scene {
       b.r = 3;
       p.cd = w.cd;
       this.cameras.main.shake(40, 0.003);
-      this.sfxShoot();
+      this.audio.shoot();
       const fx = this.add.circle(p.x + Math.cos(a) * 22, p.y + Math.sin(a) * 22, 10, 0xffe44a);
       this.fxLayer.add(fx);
       this.tweens.add({ targets: fx, alpha: 0, scale: 0.4, duration: 90, onComplete: () => fx.destroy() });
@@ -459,7 +390,7 @@ export default class GameScene extends Phaser.Scene {
       });
       p.cd = w.cd;
       p.swingT = 0.12;
-      this.sfxSwing();
+      this.audio.swing();
       const arc = this.add.graphics();
       arc.lineStyle(3, 0xffffff, 0.9);
       arc.beginPath();
@@ -502,7 +433,7 @@ export default class GameScene extends Phaser.Scene {
             b.from = 'enemy';
             b.r = 3;
             e.cd = w.cd + Math.random() * 0.1;
-            this.sfxShoot();
+            this.audio.shoot();
           } else {
             if (d < w.range + 14 + 14 - 4 && p.alive) {
               this.killPlayer();

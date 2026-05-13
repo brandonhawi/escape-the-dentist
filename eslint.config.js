@@ -18,6 +18,12 @@ export default [
           message:
             'Do not call this.physics.add.sprite() directly. Create characters via Player/Enemy in src/entities/Character.ts.',
         },
+        {
+          selector:
+            "CallExpression[callee.property.name='collider'][arguments.0.property.name='enemyGroup'][arguments.1.property.name='enemyGroup']",
+          message:
+            'Do not add an enemyGroup-vs-enemyGroup collider. It produces wall-collision vibration (the bounces cascade into static walls).',
+        },
       ],
       // Loosen a few defaults that bite us on Phaser-style code:
       '@typescript-eslint/no-explicit-any': 'off',

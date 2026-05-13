@@ -1,12 +1,6 @@
 import Phaser from 'phaser';
-import type { WeaponKey } from '../config.ts';
+import { WEAPONS, type WeaponKey } from '../config.ts';
 
-// All game characters share a 24x24 axis-aligned physics body sized in
-// display units, centered on the visible sprite. This is the architectural
-// expression of a previous bug: scaled-circle bodies (setCircle on a
-// non-square texture displayed at a different scale) desynced visually
-// from the sprite and caused wall vibration. Encoding the choice as a
-// class means there is no "default body" to accidentally use.
 const BODY_SIZE = 24;
 const DISPLAY_W = 36;
 const DISPLAY_H = 32;
@@ -63,6 +57,7 @@ export class Enemy extends Character {
     super(scene, x, y, kind === 'fast' ? 'fast' : 'dentist');
     this.kind = kind;
     this.weapon = weapon;
+    this.ammo = WEAPONS[weapon].ammo ?? 0;
     this.speed = kind === 'fast' ? 170 : 110;
     this.cd = Math.random() * 0.5;
   }

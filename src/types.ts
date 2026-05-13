@@ -1,9 +1,6 @@
 import Phaser from 'phaser';
 import type { WeaponKey } from './config.ts';
 
-// Player and Enemy live in entities/Character.ts as proper classes
-// so character creation is centralized and the physics body shape is
-// enforced architecturally.
 export { Player, Enemy } from './entities/Character.ts';
 export type { EnemyKind } from './entities/Character.ts';
 
